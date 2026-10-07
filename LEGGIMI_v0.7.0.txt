@@ -1,0 +1,52 @@
+ValMan v0.7.0 - SUPABASE SHARED BACKEND
+
+VERSIONE
+- applicationId: com.skilla.valman (invariato)
+- versionCode: 12
+- versionName: 0.7.0
+- Java 8 / compileSdk 33 / AIDE compatibile
+- Installare SOPRA la v0.6.1, senza disinstallare, per conservare i dati locali.
+
+NOVITA PRINCIPALI
+- Backend condiviso migrato dal vecchio server dedicato a Supabase.
+- Project URL e Publishable key configurati nell'app. Nessuna Secret key/service_role e nessuna password database sono incluse nell'APK.
+- Login Supabase con sessione cifrata sul dispositivo (Android Keystore).
+- Refresh automatico della sessione quando il token scade.
+- Sincronizzazione condivisa di: macchine, guasti, interventi, ferie/PAR, comunicazioni, consegne, documenti (metadati), turni e dati OCR turnazione.
+- Personale manutenzione precaricato e sincronizzato da staff_directory.
+- OCR turnazione e correzione manuale usano tutta l'anagrafica manutentori, non solo gli utenti con account.
+- Admin: creazione ID dipendente via Supabase con codice di attivazione monouso; la password viene scelta dal dipendente.
+- Tasto indietro e chiusura/reset chat Skilla della v0.6.1 preservati.
+
+PRIMO ACCESSO DELL'AMMINISTRATORE
+L'account amministratore Supabase esistente e il profilo PSCHILLA sono gia predisposti nel database.
+Dopo l'installazione:
+1. Apri ValMan -> Amministrazione -> Supabase & sincronizzazione.
+2. La prima volta accedi con l'email dell'account Supabase e la tua password.
+3. Premi Sincronizza ora.
+4. Dopo il deploy della funzione login-id, potrai usare anche PSCHILLA direttamente al login.
+
+ACCOUNT COLLEGHI
+Per creare un collega:
+1. Admin -> Crea ID dipendente.
+2. Inserisci ID, nome e ruolo.
+3. ValMan mostra un codice di attivazione monouso.
+4. Il collega apre Primo accesso / Attiva ID e inserisce ID + codice + una password personale di almeno 8 caratteri.
+L'amministratore non vede e non conserva la password del collega.
+
+EDGE FUNCTIONS DA DISTRIBUIRE
+Per login con ID e attivazione nuovi account servono:
+- login-id
+- claim-account
+I sorgenti sono in supabase/functions/.
+Vedi SUPABASE_EDGE_FUNCTIONS_v0.7.0.txt.
+
+LIMITI DI QUESTA VERSIONE
+- La sincronizzazione dei dati strutturati e operativa.
+- Foto/PDF/file binari non vengono ancora caricati automaticamente nello Storage Supabase: i riferimenti content:// restano locali. Il bucket e le policy sono gia predisposti per il prossimo step.
+- Skilla Bot locale continua a funzionare. L'AI tecnica online richiede ancora un endpoint AI separato; nessuna chiave AI e inserita nell'APK.
+- Il vecchio folder server/ rimane nel sorgente solo come riferimento storico e non viene usato dalla v0.7.0.
+
+SICUREZZA
+- Nell'app Android e presente esclusivamente la Publishable key Supabase.
+- Non inserire mai Secret key, service_role, database password o chiavi AI nel progetto Android o nel repository pubblico.

@@ -130,11 +130,18 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         super.onCreate(savedInstanceState);
         store = new AppStore(this);
         tokenVault = new TokenVault(this);
+        String oldBackend=store.getSetting("server_base_url","");
+        String oldAi=store.getSetting("ai_endpoint","");
+        if(!oldBackend.isEmpty()&&!RemoteApi.normalizeBase(oldBackend).equals(SupabaseConfig.PROJECT_URL)){
+            tokenVault.clear();
+            if(!oldAi.isEmpty()&&oldAi.startsWith(RemoteApi.normalizeBase(oldBackend)))store.setSetting("ai_endpoint","");
+        }
+        store.setSetting("server_base_url",SupabaseConfig.PROJECT_URL);
         store.setChangeListener(this::scheduleAutoSync);
         tts = new TextToSpeech(this, this);
         getWindow().setStatusBarColor(C_BG);
         getWindow().setNavigationBarColor(C_BG);
-        if (!store.hasAdmin()) showAdminSetup();
+        if (!store.hasAdmin()) showLogin();
         else if (store.currentUser() != null) showDashboard();
         else showLogin();
     }
@@ -427,24 +434,22 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void showLogin() {
         LinearLayout r=screen(); currentScreenKey="LOGIN";
         TextView logo=text("ValMan",38,C_TEXT,true); logo.setGravity(Gravity.CENTER); logo.setBackgroundResource(com.skilla.valman.R.drawable.bg_logo); logo.setPadding(dp(32),dp(24),dp(32),dp(24)); r.addView(logo);
-        TextView p=sub(remoteBase().isEmpty()?"Manutenzione • accesso locale":"Manutenzione • accesso condiviso"); p.setGravity(Gravity.CENTER); r.addView(p);
-        if(!remoteBase().isEmpty()){TextView cloud=sub("Server: "+remoteBase());cloud.setGravity(Gravity.CENTER);r.addView(cloud);}
-        final EditText id=input("ID dipendente"); final EditText pass=input("Password"); pass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD); r.addView(id);r.addView(pass);
+        TextView p=sub("Manutenzione • Supabase condiviso"); p.setGravity(Gravity.CENTER); r.addView(p);
+        TextView cloud=sub("☁ Backend ValMan pronto");cloud.setGravity(Gravity.CENTER);r.addView(cloud);
+        final EditText id=input("ID dipendente o email"); final EditText pass=input("Password"); pass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD); r.addView(id);r.addView(pass);
         Button login=button("Accedi",C_BLUE); r.addView(login);
         login.setOnClickListener(v->{
-            String uid=str(id).toUpperCase(Locale.ITALY), pw=str(pass);
-            if(uid.isEmpty()){toast("Inserisci il tuo ID.");return;}
-            if(!remoteBase().isEmpty()){performRemoteLogin(uid,pw);return;}
-            JSONObject u=store.findUser(uid);
-            if(u==null||!u.optBoolean("enabled",true)){toast("ID non valido o disabilitato.");return;}
-            if(store.needsPassword(u)){ showFirstPassword(u); return; }
-            if(!store.verifyPassword(u,pw)){toast("Password errata.");return;}
-            store.setCurrentUser(u.optString("id")); showDashboard();
+            String raw=str(id), pw=str(pass);
+            if(raw.isEmpty()){toast("Inserisci il tuo ID o la tua email.");return;}
+            String uid=raw.contains("@")?raw:raw.toUpperCase(Locale.ITALY);
+            performRemoteLogin(uid,pw);
         });
-        Button server=button(remoteBase().isEmpty()?"Collega un server ValMan":"Cambia server",C_PANEL2);r.addView(server);server.setOnClickListener(v->showRemoteJoinSetup());
-        if(!remoteBase().isEmpty()){
-            Button offline=button("Accesso offline con dati già salvati",C_PANEL2);r.addView(offline);offline.setOnClickListener(v->{JSONObject u=store.findUser(str(id));if(u!=null&&store.verifyPassword(u,str(pass))){store.setCurrentUser(u.optString("id"));showDashboard();}else toast("Per l'accesso offline devi aver già effettuato almeno un accesso su questo telefono.");});
-        }
+        Button first=button("Primo accesso / Attiva ID",C_GREEN);r.addView(first);
+        first.setOnClickListener(v->{String uid=str(id).toUpperCase(Locale.ITALY);if(uid.isEmpty()||uid.contains("@")){toast("Inserisci prima l'ID dipendente assegnato dall'amministratore.");return;}showRemoteFirstPassword(uid);});
+        Button status=button("☁ Stato Supabase",C_PANEL2);r.addView(status);status.setOnClickListener(v->showServerSettings());
+        Button offline=button("Accesso offline con dati già salvati",C_PANEL2);r.addView(offline);
+        offline.setOnClickListener(v->{String raw=str(id);JSONObject u=raw.contains("@")?store.findUserByAuthLogin(raw):store.findUser(raw);if(u!=null&&store.verifyPassword(u,str(pass))){store.setCurrentUser(u.optString("id"));showDashboard();}else toast("Per l'accesso offline devi aver già effettuato almeno un accesso su questo telefono.");});
+        LinearLayout note=card();note.addView(text("Primo collegamento amministratore",13,C_CYAN,true));note.addView(sub("Se l'account Supabase è stato creato con una normale email, usa l'email la prima volta. ValMan memorizzerà poi l'associazione con il tuo ID."));r.addView(note);
     }
 
     private void showFirstPassword(final JSONObject u) {
@@ -455,33 +460,39 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
 
-    private String remoteBase(){ return RemoteApi.normalizeBase(store==null?"":store.getSetting("server_base_url","")); }
+    private String remoteBase(){ return SupabaseConfig.PROJECT_URL; }
     private boolean remoteReady(){ return !remoteBase().isEmpty() && tokenVault!=null && !tokenVault.load().isEmpty(); }
 
     private void performRemoteLogin(final String id,final String password){
-        RemoteApi.login(remoteBase(),id,password,mainHandler,new RemoteApi.Callback(){
+        String login=id==null?"":id.trim();
+        if(!login.contains("@")){JSONObject cached=store.findUser(login);if(cached!=null&&!cached.optString("authLogin","").isEmpty())login=cached.optString("authLogin");}
+        final String authLogin=login;
+        final String original=id==null?"":id.trim();
+        RemoteApi.login(remoteBase(),authLogin,password,mainHandler,new RemoteApi.Callback(){
             @Override public void ok(JSONObject data){
-                JSONObject u=data.optJSONObject("user"); String token=data.optString("token","");
-                if(u==null||token.isEmpty()){toast("Risposta server non valida.");return;}
-                tokenVault.save(token); store.cacheRemoteUser(u,password); store.setCurrentUser(u.optString("id"));
-                store.setSetting("ai_endpoint",RemoteApi.skillaEndpoint(remoteBase()));
+                JSONObject u=data.optJSONObject("user"); String token=data.optString("token","");String refresh=data.optString("refreshToken","");
+                if(u==null||token.isEmpty()){toast("Risposta Supabase non valida.");return;}
+                try{if(u.optString("authLogin","").isEmpty())u.put("authLogin",data.optString("loginEmail",authLogin));}catch(Exception ignored){}
+                tokenVault.saveSession(token,refresh); store.cacheRemoteUser(u,password); store.setCurrentUser(u.optString("id"));
                 runRemoteSync(false); showDashboard();
             }
             @Override public void error(int code,String message,JSONObject data){
-                if("PASSWORD_NOT_SET".equals(data.optString("error"))||code==409){showRemoteFirstPassword(id);return;}
-                JSONObject local=store.findUser(id);
-                if(local!=null&&store.verifyPassword(local,password)){toast("Server non raggiungibile: accesso offline.");store.setCurrentUser(local.optString("id"));showDashboard();return;}
+                JSONObject local=original.contains("@")?store.findUserByAuthLogin(original):store.findUser(original);
+                if(local!=null&&store.verifyPassword(local,password)){toast("Supabase non raggiungibile: accesso offline.");store.setCurrentUser(local.optString("id"));showDashboard();return;}
                 toast("Accesso non riuscito: "+message);
             }
         });
     }
 
     private void showRemoteFirstPassword(final String id){
-        final EditText e=new EditText(this);e.setHint("Nuova password (minimo 6 caratteri)");e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);e.setPadding(dp(16),dp(12),dp(16),dp(12));
-        new AlertDialog.Builder(this).setTitle("Primo accesso").setMessage("ID: "+id+"\nScegli la tua password personale.").setView(e)
-                .setPositiveButton("Imposta",(d,w)->{String pw=e.getText().toString();if(pw.length()<6){toast("Password troppo corta.");return;}RemoteApi.claim(remoteBase(),id,pw,mainHandler,new RemoteApi.Callback(){
-                    @Override public void ok(JSONObject data){JSONObject u=data.optJSONObject("user");String token=data.optString("token","");if(u==null||token.isEmpty()){toast("Risposta server non valida.");return;}tokenVault.save(token);store.cacheRemoteUser(u,pw);store.setCurrentUser(u.optString("id"));store.setSetting("ai_endpoint",RemoteApi.skillaEndpoint(remoteBase()));runRemoteSync(false);showDashboard();}
-                    @Override public void error(int code,String message,JSONObject data){toast("Non riesco a impostare la password: "+message);}
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(18),dp(6),dp(18),0);
+        final EditText code=new EditText(this);code.setHint("Codice di attivazione");code.setPadding(dp(12),dp(12),dp(12),dp(12));
+        final EditText e=new EditText(this);e.setHint("Nuova password (minimo 8 caratteri)");e.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);e.setPadding(dp(12),dp(12),dp(12),dp(12));
+        box.addView(code);box.addView(e);
+        new AlertDialog.Builder(this).setTitle("Attiva account ValMan").setMessage("ID: "+id+"\nInserisci il codice ricevuto dall'amministratore e scegli la tua password personale.").setView(box)
+                .setPositiveButton("Attiva",(d,w)->{String pw=e.getText().toString();String activation=code.getText().toString().trim();if(activation.length()<4){toast("Inserisci il codice di attivazione.");return;}if(pw.length()<8){toast("Password troppo corta: usa almeno 8 caratteri.");return;}RemoteApi.claim(remoteBase(),id,activation,pw,mainHandler,new RemoteApi.Callback(){
+                    @Override public void ok(JSONObject data){JSONObject u=data.optJSONObject("user");String token=data.optString("token","");String refresh=data.optString("refreshToken","");if(u==null||token.isEmpty()){toast("Risposta Supabase non valida.");return;}tokenVault.saveSession(token,refresh);store.cacheRemoteUser(u,pw);store.setCurrentUser(u.optString("id"));runRemoteSync(false);showDashboard();}
+                    @Override public void error(int code,String message,JSONObject data){toast("Non riesco ad attivare l'account: "+message);}
                 });}).setNegativeButton("Annulla",null).show();
     }
 
@@ -490,11 +501,23 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         syncHandler.removeCallbacksAndMessages(null);syncHandler.postDelayed(()->runRemoteSync(false),1400);
     }
 
-    private void runRemoteSync(final boolean manual){
+    private void runRemoteSync(final boolean manual){runRemoteSync(manual,false);}
+
+    private void runRemoteSync(final boolean manual,final boolean retried){
         if(syncBusy||!remoteReady())return;syncBusy=true;
         RemoteApi.sync(remoteBase(),tokenVault.load(),store.exportSyncSnapshot(),mainHandler,new RemoteApi.Callback(){
-            @Override public void ok(JSONObject data){syncBusy=false;JSONObject snap=data.optJSONObject("snapshot");if(snap!=null)store.mergeSyncSnapshot(snap);store.setSetting("last_sync",AppStore.now());if(manual)toast("Sincronizzazione completata.");}
-            @Override public void error(int code,String message,JSONObject data){syncBusy=false;if(code==401){tokenVault.clear();}if(manual)toast("Sincronizzazione non riuscita: "+message);}
+            @Override public void ok(JSONObject data){syncBusy=false;JSONObject snap=data.optJSONObject("snapshot");if(snap!=null)store.mergeSyncSnapshot(snap);store.setSetting("last_sync",AppStore.now());if(manual)toast("Sincronizzazione Supabase completata.");}
+            @Override public void error(int code,String message,JSONObject data){
+                syncBusy=false;
+                if(code==401&&!retried&&!tokenVault.loadRefresh().isEmpty()){
+                    RemoteApi.refresh(remoteBase(),tokenVault.loadRefresh(),mainHandler,new RemoteApi.Callback(){
+                        @Override public void ok(JSONObject d){String t=d.optString("token","");String r=d.optString("refreshToken",tokenVault.loadRefresh());if(t.isEmpty()){tokenVault.clear();if(manual)toast("Sessione scaduta: accedi di nuovo.");return;}tokenVault.saveSession(t,r);runRemoteSync(manual,true);}
+                        @Override public void error(int c,String m,JSONObject d){tokenVault.clear();if(manual)toast("Sessione scaduta: accedi di nuovo.");}
+                    });
+                    return;
+                }
+                if(code==401)tokenVault.clear();if(manual)toast("Sincronizzazione non riuscita: "+message);
+            }
         });
     }
 
@@ -513,7 +536,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         top.addView(names,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
         Button out=button("Esci",C_PANEL2); out.setTextSize(13); out.setLayoutParams(new LinearLayout.LayoutParams(dp(76),dp(44))); out.setOnClickListener(v->{store.logout();if(tokenVault!=null)tokenVault.clear();showLogin();}); top.addView(out);
         hero.addView(top);
-        if(!remoteBase().isEmpty()){String ls=store.getSetting("last_sync","");hero.addView(sub(remoteReady()?"☁ Condiviso"+(ls.isEmpty()?"":" • ultimo sync "+ls):"☁ Server configurato • accesso offline"));}
+        if(!remoteBase().isEmpty()){String ls=store.getSetting("last_sync","");hero.addView(sub(remoteReady()?"☁ Supabase condiviso"+(ls.isEmpty()?"":" • ultimo sync "+ls):"☁ Supabase pronto • accesso offline"));}
         r.addView(hero);
         scheduleAutoSync();
 
@@ -1286,7 +1309,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         toast("Analisi del settimanale in corso…");
         pendingOcrImageUri=uri==null?"":uri.toString();
         pendingOcrWeek=null;
-        TurnationOcr.analyze(this,uri,store.array("users"),new TurnationOcr.Callback(){
+        TurnationOcr.analyze(this,uri,store.rosterUsers(),new TurnationOcr.Callback(){
             @Override public void onSuccess(List<TurnationOcr.Row> rows,String rawText,boolean headerFound,String detectedWeekStart){
                 pendingOcrRows=rows; pendingOcrRaw=rawText;
                 if(detectedWeekStart!=null&&!detectedWeekStart.isEmpty()){
@@ -1332,7 +1355,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         });
     }
 
-    private void showShiftEditor(){LinearLayout r=screen();addHeader(r,"Imposta turni",this::showTurnationWeek);JSONArray users=store.array("users");ArrayList<String> labels=new ArrayList<>();ArrayList<String> ids=new ArrayList<>();for(int i=0;i<users.length();i++){JSONObject u=users.optJSONObject(i);if(u.optBoolean("enabled",true)){labels.add(u.optString("name")+" ("+u.optString("id")+")");ids.add(u.optString("id"));}}Spinner us=simpleSpinner(labels);r.addView(us);final EditText[] ed=new EditText[7];for(int i=0;i<7;i++){LocalDate d=turnationWeek.plusDays(i);ed[i]=input(d.getDayOfWeek().getDisplayName(TextStyle.FULL,Locale.ITALIAN)+" "+d.getDayOfMonth()+" • codice turno");r.addView(ed[i]);}Button load=button("Carica turni esistenti",C_PANEL2);r.addView(load);load.setOnClickListener(v->{if(ids.isEmpty())return;String id=ids.get(us.getSelectedItemPosition());for(int i=0;i<7;i++)ed[i].setText(store.getShift(id,turnationWeek.plusDays(i).toString()));});Button save=button("Salva settimana",C_GREEN);r.addView(save);save.setOnClickListener(v->{if(ids.isEmpty())return;String id=ids.get(us.getSelectedItemPosition());for(int i=0;i<7;i++)store.setShift(id,turnationWeek.plusDays(i).toString(),str(ed[i]));showTurnationWeek();});}
+    private void showShiftEditor(){LinearLayout r=screen();addHeader(r,"Imposta turni",this::showTurnationWeek);JSONArray users=store.rosterUsers();ArrayList<String> labels=new ArrayList<>();ArrayList<String> ids=new ArrayList<>();for(int i=0;i<users.length();i++){JSONObject u=users.optJSONObject(i);if(u.optBoolean("enabled",true)){labels.add(u.optString("name")+" ("+u.optString("id")+")");ids.add(u.optString("id"));}}Spinner us=simpleSpinner(labels);r.addView(us);final EditText[] ed=new EditText[7];for(int i=0;i<7;i++){LocalDate d=turnationWeek.plusDays(i);ed[i]=input(d.getDayOfWeek().getDisplayName(TextStyle.FULL,Locale.ITALIAN)+" "+d.getDayOfMonth()+" • codice turno");r.addView(ed[i]);}Button load=button("Carica turni esistenti",C_PANEL2);r.addView(load);load.setOnClickListener(v->{if(ids.isEmpty())return;String id=ids.get(us.getSelectedItemPosition());for(int i=0;i<7;i++)ed[i].setText(store.getShift(id,turnationWeek.plusDays(i).toString()));});Button save=button("Salva settimana",C_GREEN);r.addView(save);save.setOnClickListener(v->{if(ids.isEmpty())return;String id=ids.get(us.getSelectedItemPosition());for(int i=0;i<7;i++)store.setShift(id,turnationWeek.plusDays(i).toString(),str(ed[i]));showTurnationWeek();});}
 
     private void showCommunications(){LinearLayout r=screen();addHeader(r,"Comunicazioni",this::showDashboard);if(store.isAdmin(store.currentUser())){Button add=button("+ Nuova comunicazione",C_BLUE);r.addView(add);add.setOnClickListener(v->showNewCommunication());}JSONArray a=store.array("communications");if(a.length()==0)r.addView(sub("Nessuna comunicazione."));for(int i=a.length()-1;i>=0;i--){JSONObject o=a.optJSONObject(i);LinearLayout c=card();c.addView(text(o.optString("type")+" • "+o.optString("title"),17,C_TEXT,true));c.addView(sub(o.optString("when")+" • Destinatari: "+o.optString("target")));c.addView(text(o.optString("body"),14,C_TEXT,false));r.addView(c);}}
     private void showNewCommunication(){LinearLayout r=screen();addHeader(r,"Nuova comunicazione",this::showCommunications);Spinner type=simpleSpinner(Arrays.asList("AVVISO","CORSO","VISITA","RIUNIONE","SICUREZZA"));EditText title=input("Titolo");EditText when=input("Data / ora (es. 12/12/2026 08:00)");EditText target=input("Destinatari (es. Elettrici + Meccanici)");EditText body=multiInput("Dettagli...");r.addView(type);r.addView(title);r.addView(when);r.addView(target);r.addView(body);Button save=button("Pubblica",C_GREEN);r.addView(save);save.setOnClickListener(v->{if(str(title).isEmpty())return;store.addCommunication(String.valueOf(type.getSelectedItem()),str(title),str(when),str(body),str(target));showCommunications();});}
@@ -1341,8 +1364,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     private void showAdmin(){
         LinearLayout r=screen(); addHeader(r,"Amministrazione",this::showDashboard);
-        Button server=button("☁ Server & sincronizzazione",C_CYAN);r.addView(server);server.setOnClickListener(v->showServerSettings());
+        Button server=button("☁ Supabase & sincronizzazione",C_CYAN);r.addView(server);server.setOnClickListener(v->showServerSettings());
         Button user=button("+ Crea ID dipendente",C_BLUE); r.addView(user); user.setOnClickListener(v->showAddUser());
+        Button staff=button("👥 Personale manutenzione",C_PANEL2);r.addView(staff);staff.setOnClickListener(v->showStaffDirectory());
         Button ai=button("🤖 Impostazioni Skilla Bot",C_CYAN); r.addView(ai); ai.setOnClickListener(v->showSkillaSettings());
         Button sync=button("↻ Sincronizza adesso",C_PANEL2);r.addView(sync);sync.setEnabled(remoteReady());sync.setOnClickListener(v->runRemoteSync(true));
         Button demo=button("Carica dati DEMO Skilla Bot",C_ORANGE); r.addView(demo); demo.setOnClickListener(v->{store.addDemoData(store.currentUserId());toast("Dati demo caricati (marcati DEMO).");showAdmin();});
@@ -1362,32 +1386,30 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             });}
             r.addView(c);
         }
-        LinearLayout warn=card(); warn.addView(text(remoteReady()?"Modalità condivisa attiva":"Modalità locale",14,remoteReady()?C_GREEN:C_ORANGE,true));
-        warn.addView(sub(remoteReady()?"I dati vengono sincronizzati col server. In assenza di rete continui a lavorare sulla copia locale e ValMan ritenta appena possibile.":"Collega il server prima di distribuire l'app ai colleghi. La chiave AI rimane esclusivamente sul backend."));
+        LinearLayout warn=card(); warn.addView(text(remoteReady()?"Modalità condivisa Supabase attiva":"Modalità locale • Supabase non autenticato",14,remoteReady()?C_GREEN:C_ORANGE,true));
+        warn.addView(sub(remoteReady()?"I dati vengono sincronizzati su Supabase. In assenza di rete continui a lavorare sulla copia locale e ValMan ritenta appena possibile.":"Effettua l'accesso a Supabase per condividere dati e account tra i telefoni. La chiave AI non è contenuta nell'APK."));
         r.addView(warn);
     }
 
     private void showServerSettings(){
-        LinearLayout r=screen();addHeader(r,"Server & sincronizzazione",this::showAdmin);
+        Runnable back=store.currentUser()==null?this::showLogin:this::showAdmin;
+        LinearLayout r=screen();addHeader(r,"Supabase & sincronizzazione",back);
         LinearLayout st=card();String last=store.getSetting("last_sync","");
-        st.addView(text(remoteReady()?"Server collegato":"Server non collegato",18,remoteReady()?C_GREEN:C_ORANGE,true));
-        st.addView(sub(remoteBase().isEmpty()?"Configura un backend ValMan per condividere dati e account tra i telefoni.":remoteBase()+(last.isEmpty()?"":"\nUltima sincronizzazione: "+last)));r.addView(st);
+        st.addView(text(remoteReady()?"Supabase collegato":"Supabase pronto • accesso richiesto",18,remoteReady()?C_GREEN:C_ORANGE,true));
+        st.addView(sub(SupabaseConfig.PROJECT_URL+(last.isEmpty()?"":"\nUltima sincronizzazione: "+last)));r.addView(st);
 
-        EditText base=input("https://server-valman.example.com");base.setText(remoteBase());r.addView(label("URL server HTTPS"));r.addView(base);
-        Button save=button("Salva indirizzo",C_BLUE);r.addView(save);save.setOnClickListener(v->{String b=RemoteApi.normalizeBase(str(base));if(!b.isEmpty()&&!b.startsWith("https://")){toast("Usa HTTPS.");return;}store.setSetting("server_base_url",b);store.setSetting("ai_endpoint",RemoteApi.skillaEndpoint(b));tokenVault.clear();toast("Indirizzo salvato. Ora testa o effettua l'accesso.");showServerSettings();});
+        Button test=button("Test connessione",C_PANEL2);r.addView(test);test.setOnClickListener(v->RemoteApi.health(remoteBase(),mainHandler,new RemoteApi.Callback(){@Override public void ok(JSONObject data){toast("Supabase ValMan raggiungibile.");}@Override public void error(int code,String message,JSONObject data){toast("Supabase non raggiungibile: "+message);}}));
 
-        Button test=button("Test connessione",C_PANEL2);r.addView(test);test.setOnClickListener(v->{String b=RemoteApi.normalizeBase(str(base));if(b.isEmpty())b=remoteBase();if(b.isEmpty()){toast("Inserisci il server.");return;}RemoteApi.health(b,mainHandler,new RemoteApi.Callback(){@Override public void ok(JSONObject data){toast("Server ValMan raggiungibile.");}@Override public void error(int code,String message,JSONObject data){toast("Server non raggiungibile: "+message);}});});
+        JSONObject current=store.currentUser();
+        EditText loginId=input("ID o email del mio account");
+        if(current!=null)loginId.setText(current.optString("authLogin",current.optString("id")));
+        EditText loginPw=input("Password del mio account");loginPw.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);r.addView(loginId);r.addView(loginPw);
+        Button connect=button("Accedi / rinnova collegamento",C_GREEN);r.addView(connect);connect.setOnClickListener(v->{String who=str(loginId);if(who.isEmpty()||str(loginPw).isEmpty()){toast("Inserisci ID/email e password.");return;}performRemoteLogin(who,str(loginPw));});
 
-        LinearLayout bootstrap=card();bootstrap.addView(text("Prima installazione del server",15,C_CYAN,true));bootstrap.addView(sub("Questa operazione serve una sola volta. Usa il codice di setup configurato sul server e la password del tuo account amministratore."));
-        EditText setup=input("Codice setup server");EditText pw=input("Password amministratore");pw.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);bootstrap.addView(setup);bootstrap.addView(pw);
-        Button init=button("Inizializza server con il mio account",C_ORANGE);bootstrap.addView(init);init.setOnClickListener(v->{JSONObject u=store.currentUser();String b=RemoteApi.normalizeBase(str(base));if(b.isEmpty())b=remoteBase();if(u==null||b.isEmpty()||str(setup).isEmpty()||str(pw).length()<6){toast("Compila server, codice setup e password.");return;}final String fb=b;RemoteApi.bootstrap(fb,str(setup),u.optString("id"),u.optString("name"),str(pw),mainHandler,new RemoteApi.Callback(){@Override public void ok(JSONObject data){store.setSetting("server_base_url",fb);store.setSetting("ai_endpoint",RemoteApi.skillaEndpoint(fb));String token=data.optString("token","");if(!token.isEmpty())tokenVault.save(token);JSONObject ru=data.optJSONObject("user");if(ru!=null)store.cacheRemoteUser(ru,str(pw));runRemoteSync(true);showServerSettings();}@Override public void error(int code,String message,JSONObject data){toast("Inizializzazione non riuscita: "+message);}});});r.addView(bootstrap);
+        Button now=button("Sincronizza ora",C_BLUE);r.addView(now);now.setEnabled(remoteReady());now.setOnClickListener(v->runRemoteSync(true));
+        Button disconnect=button("Disconnetti questo telefono da Supabase",C_PANEL2);r.addView(disconnect);disconnect.setOnClickListener(v->{tokenVault.clear();store.setSetting("last_sync","");toast("Sessione rimossa. I dati locali restano sul telefono.");showServerSettings();});
 
-        if(!remoteBase().isEmpty()){
-            EditText loginPw=input("Password del mio account");loginPw.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);r.addView(loginPw);
-            Button connect=button("Accedi / rinnova collegamento",C_GREEN);r.addView(connect);connect.setOnClickListener(v->{JSONObject u=store.currentUser();if(u==null||str(loginPw).isEmpty()){toast("Inserisci la password.");return;}performRemoteLogin(u.optString("id"),str(loginPw));});
-        }
-        Button now=button("Sincronizza ora",C_GREEN);r.addView(now);now.setEnabled(remoteReady());now.setOnClickListener(v->runRemoteSync(true));
-        Button disconnect=button("Disconnetti questo telefono dal server",C_PANEL2);r.addView(disconnect);disconnect.setOnClickListener(v->{tokenVault.clear();store.setSetting("last_sync","");toast("Token server rimosso. I dati locali restano sul telefono.");showServerSettings();});
+        LinearLayout info=card();info.addView(text("Sicurezza",14,C_CYAN,true));info.addView(sub("Nell'APK è presente solo la Publishable key di Supabase. Nessuna Secret key, service_role o password del database viene salvata nell'app."));r.addView(info);
     }
 
     private void showSkillaSettings(){
@@ -1426,19 +1448,28 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void showAddUser(){
         LinearLayout r=screen();addHeader(r,"Nuovo dipendente",this::showAdmin);
         EditText id=input("ID dipendente");EditText name=input("Nome visualizzato");Spinner role=simpleSpinner(Arrays.asList("MECCANICO","ELETTRICO","LETTURA"));
-        r.addView(id);r.addView(name);r.addView(role);Button save=button("Crea ID senza password",C_GREEN);r.addView(save);
+        r.addView(id);r.addView(name);r.addView(role);Button save=button("Crea ID e codice di attivazione",C_GREEN);r.addView(save);
         save.setOnClickListener(v->{
             String uid=str(id).toUpperCase(Locale.ITALY),nm=str(name),rl=String.valueOf(role.getSelectedItem());
             if(uid.length()<2||nm.isEmpty()){toast("Compila ID e nome.");return;}
             if(store.userIdExists(uid)){toast("ID già esistente.");return;}
-            if(remoteReady()){
-                RemoteApi.createUser(remoteBase(),tokenVault.load(),uid,nm,rl,mainHandler,new RemoteApi.Callback(){
-                    @Override public void ok(JSONObject data){JSONObject u=data.optJSONObject("user");if(u!=null)store.cacheRemoteUser(u,"");runRemoteSync(false);toast("ID creato sul server. L'utente sceglierà la password al primo accesso.");showAdmin();}
-                    @Override public void error(int code,String message,JSONObject data){toast("Creazione non riuscita: "+message);}
-                });
-            }else{store.addUser(uid,nm,rl,"");toast("ID creato localmente. L'utente sceglierà la password al primo accesso.");showAdmin();}
+            if(!remoteReady()){toast("Accedi prima a Supabase dall'area sincronizzazione.");return;}
+            RemoteApi.createUser(remoteBase(),tokenVault.load(),uid,nm,rl,mainHandler,new RemoteApi.Callback(){
+                @Override public void ok(JSONObject data){JSONObject u=data.optJSONObject("user");if(u!=null)store.cacheRemoteUser(u,"");String code=data.optString("activationCode","");runRemoteSync(false);new AlertDialog.Builder(MainActivity.this).setTitle("ID creato").setMessage("Dipendente: "+uid+"\nCodice di attivazione: "+code+"\n\nComunica ID e codice al dipendente. La password la sceglierà lui al primo accesso.").setPositiveButton("OK",(d,w)->showAdmin()).show();}
+                @Override public void error(int code,String message,JSONObject data){toast("Creazione non riuscita: "+message);}
+            });
         });
     }
+
+    private void showStaffDirectory(){
+        LinearLayout r=screen();addHeader(r,"Personale manutenzione",this::showAdmin);
+        JSONArray a=store.array("staffDirectory");
+        if(a.length()==0){r.addView(sub("Anagrafica non ancora sincronizzata."));return;}
+        String lastTeam="";
+        for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||!o.optBoolean("active",true))continue;String team=o.optString("team","");if(!team.equals(lastTeam)){r.addView(label(teamLabel(team)));lastTeam=team;}LinearLayout c=card();String badge=o.optString("badge_code","");if("null".equalsIgnoreCase(badge))badge="";c.addView(text(o.optString("roster_name"),16,C_TEXT,true));c.addView(sub(roleStaffLabel(o.optString("trade"))+(badge.isEmpty()?"":" • Cart. "+badge)));r.addView(c);}
+    }
+    private String teamLabel(String t){if("MECCANICA".equals(t))return"Meccanica";if("ELETTRICA".equals(t))return"Elettrica / Elettronica";return"Responsabili";}
+    private String roleStaffLabel(String t){if("CAPO_REPARTO".equals(t))return"Capo reparto";if("CAPO_SQUADRA".equals(t))return"Capo squadra";if("ELETTRICO".equals(t))return"Man. elettrico/elettronico";return"Man. meccanico";}
 
     private void showProfile(){LinearLayout r=screen();addHeader(r,"Profilo",this::showDashboard);JSONObject u=store.currentUser();LinearLayout c=card();c.addView(text(u.optString("name"),20,C_TEXT,true));c.addView(sub("ID: "+u.optString("id")));c.addView(sub("Ruolo: "+roleLabel(u.optString("role"))));r.addView(c);}
 

@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.claim-account]
 verify_jwt = false
+
+[functions.login-id]
+verify_jwt = false

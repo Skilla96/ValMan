@@ -1,0 +1,22 @@
+ValMan v0.7.0 - Deploy Edge Functions Supabase
+
+Queste funzioni sono necessarie per:
+- login-id: accesso con ID dipendente (es. PSCHILLA) invece dell'email Auth.
+- claim-account: primo accesso del collega con ID + codice di attivazione + password scelta da lui.
+
+Dal Codespace nella root di ValMan:
+
+1) Login CLI Supabase (apre la procedura di autorizzazione; non condividere token/password in chat):
+   npx supabase@latest login
+
+2) Collega il progetto:
+   npx supabase@latest link --project-ref jucckkvrrmaflrowqtej
+
+3) Distribuisci le funzioni pubbliche che gestiscono internamente l'autenticazione:
+   npx supabase@latest functions deploy login-id --no-verify-jwt
+   npx supabase@latest functions deploy claim-account --no-verify-jwt
+
+Le funzioni usano le credenziali server-side fornite dall'ambiente Supabase. Nessuna Secret key deve essere aggiunta all'APK.
+
+NOTA
+bootstrap-admin non serve per questo progetto perche l'amministratore PSCHILLA e gia stato creato manualmente nel database Supabase.

@@ -17,7 +17,9 @@ import javax.crypto.spec.GCMParameterSpec;
 public class TokenVault {
     private static final String PREF="valman_secure";
     private static final String ALIAS="valman_token_key";
-    private static final String FIELD="server_token";
+    // Keep the original field name for backward compatibility with v0.5/v0.6.
+    private static final String FIELD_ACCESS="server_token";
+    private static final String FIELD_REFRESH="server_refresh_token";
     private final SharedPreferences prefs;
 
     public TokenVault(Context c){prefs=c.getSharedPreferences(PREF,Context.MODE_PRIVATE);}
@@ -31,17 +33,17 @@ public class TokenVault {
         return kg.generateKey();
     }
 
-    public void save(String token){
+    private void saveField(String field,String value){
         try{
             Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.ENCRYPT_MODE,key());
-            byte[] iv=c.getIV();byte[] enc=c.doFinal((token==null?"":token).getBytes(StandardCharsets.UTF_8));
+            byte[] iv=c.getIV();byte[] enc=c.doFinal((value==null?"":value).getBytes(StandardCharsets.UTF_8));
             String packed=Base64.encodeToString(iv,Base64.NO_WRAP)+"."+Base64.encodeToString(enc,Base64.NO_WRAP);
-            prefs.edit().putString(FIELD,packed).apply();
-        }catch(Exception e){prefs.edit().remove(FIELD).apply();}
+            prefs.edit().putString(field,packed).apply();
+        }catch(Exception e){prefs.edit().remove(field).apply();}
     }
 
-    public String load(){
-        String packed=prefs.getString(FIELD,"");if(packed.isEmpty())return"";
+    private String loadField(String field){
+        String packed=prefs.getString(field,"");if(packed.isEmpty())return"";
         try{
             String[] p=packed.split("\\.",2);if(p.length!=2)return"";
             byte[] iv=Base64.decode(p[0],Base64.NO_WRAP), enc=Base64.decode(p[1],Base64.NO_WRAP);
@@ -50,5 +52,10 @@ public class TokenVault {
         }catch(Exception e){return"";}
     }
 
-    public void clear(){prefs.edit().remove(FIELD).apply();}
+    public void save(String token){saveField(FIELD_ACCESS,token);}
+    public void saveSession(String accessToken,String refreshToken){saveField(FIELD_ACCESS,accessToken);saveField(FIELD_REFRESH,refreshToken);}
+    public String load(){return loadField(FIELD_ACCESS);}
+    public String loadRefresh(){return loadField(FIELD_REFRESH);}
+
+    public void clear(){prefs.edit().remove(FIELD_ACCESS).remove(FIELD_REFRESH).apply();}
 }

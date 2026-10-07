@@ -48,6 +48,7 @@ public class AppStore {
         if (!prefs.contains("handovers")) saveArray("handovers", new JSONArray());
         if (!prefs.contains("documents")) saveArray("documents", new JSONArray());
         if (!prefs.contains("shifts")) saveArray("shifts", new JSONArray());
+        if (!prefs.contains("staffDirectory")) saveArray("staffDirectory", defaultStaffDirectory());
     }
 
     private void migrateSyncMetadata() {
@@ -75,6 +76,31 @@ public class AppStore {
             o.put("id", UUID.randomUUID().toString());
             o.put("name", name); o.put("area", area); o.put("note", note); touch(o);
         } catch (JSONException ignored) {}
+        return o;
+    }
+
+    private JSONArray defaultStaffDirectory() {
+        JSONArray a=new JSONArray();
+        a.put(staff("10250","ECCHER L.","CAPO_REPARTO","DIREZIONE"));
+        a.put(staff("18331","CARRARO G.","CAPO_SQUADRA","MECCANICA"));
+        a.put(staff("17919","MOTTIN D.","MECCANICO","MECCANICA"));
+        a.put(staff("","ASBOCK M.","MECCANICO","MECCANICA"));
+        a.put(staff("18026","VISINTAINER N.","MECCANICO","MECCANICA"));
+        a.put(staff("10479","SCHILLACI P.","MECCANICO","MECCANICA"));
+        a.put(staff("","CRISTOFORETTI A.","MECCANICO","MECCANICA"));
+        a.put(staff("10472","GJEKA E.","MECCANICO","MECCANICA"));
+        a.put(staff("","KEMENATER N.","MECCANICO","MECCANICA"));
+        a.put(staff("197","MICHELONI M.","CAPO_SQUADRA","ELETTRICA"));
+        a.put(staff("190","VACCARI C.","ELETTRICO","ELETTRICA"));
+        a.put(staff("","PRESCIANOTTO G.","ELETTRICO","ELETTRICA"));
+        a.put(staff("10312","COSTA M.","ELETTRICO","ELETTRICA"));
+        a.put(staff("10313","STATILE V.","ELETTRICO","ELETTRICA"));
+        return a;
+    }
+
+    private JSONObject staff(String badge,String rosterName,String trade,String team){
+        JSONObject o=new JSONObject();
+        try{o.put("badge_code",badge);o.put("roster_name",rosterName);o.put("trade",trade);o.put("team",team);o.put("active",true);o.put("updated_at",isoNow());}catch(Exception ignored){}
         return o;
     }
 
@@ -114,6 +140,7 @@ public class AppStore {
         try{
             target.put("id",id);target.put("name",remote.optString("name",id));target.put("role",remote.optString("role","LETTURA"));
             target.put("enabled",remote.optBoolean("enabled",true));
+            String authLogin=remote.optString("authLogin","");if(!authLogin.isEmpty())target.put("authLogin",authLogin);
             if(password!=null&&!password.isEmpty())target.put("passwordHash",hash(password));
             else if(!target.has("passwordHash"))target.put("passwordHash","");
             touch(target);
@@ -130,8 +157,8 @@ public class AppStore {
                 JSONObject lu=null;
                 for(int i=0;i<local.length();i++){JSONObject x=local.optJSONObject(i);if(x!=null&&id.equalsIgnoreCase(x.optString("id"))){lu=x;break;}}
                 if(lu==null){lu=new JSONObject();local.put(lu);}
-                String oldHash=lu.optString("passwordHash","");
-                try{lu.put("id",id);lu.put("name",ru.optString("name",id));lu.put("role",ru.optString("role","LETTURA"));lu.put("enabled",ru.optBoolean("enabled",true));lu.put("passwordHash",oldHash);touch(lu);}catch(Exception ignored){}
+                String oldHash=lu.optString("passwordHash","");String oldLogin=lu.optString("authLogin","");
+                try{lu.put("id",id);lu.put("name",ru.optString("name",id));lu.put("role",ru.optString("role","LETTURA"));lu.put("enabled",ru.optBoolean("enabled",true));lu.put("passwordHash",oldHash);if(!oldLogin.isEmpty())lu.put("authLogin",oldLogin);touch(lu);}catch(Exception ignored){}
             }
             saveArray("users",local);
         }finally{suppressChange=false;}
@@ -140,6 +167,7 @@ public class AppStore {
     public JSONObject findUser(String id) {
         JSONArray a=array("users"); for(int i=0;i<a.length();i++){JSONObject u=a.optJSONObject(i);if(u!=null&&u.optString("id").equalsIgnoreCase(id.trim()))return u;} return null;
     }
+    public JSONObject findUserByAuthLogin(String login){JSONArray a=array("users");String q=login==null?"":login.trim();for(int i=0;i<a.length();i++){JSONObject u=a.optJSONObject(i);if(u!=null&&q.equalsIgnoreCase(u.optString("authLogin","")))return u;}return null;}
     public boolean userIdExists(String id){return findUser(id)!=null;}
     public boolean verifyPassword(JSONObject user,String password){return user!=null&&user.optBoolean("enabled",true)&&hash(password).equals(user.optString("passwordHash"));}
     public boolean needsPassword(JSONObject user){return user!=null&&user.optString("passwordHash","").isEmpty();}
@@ -212,6 +240,7 @@ public class AppStore {
             mergeMapRecords(remote.optJSONArray("turnationImages"),"turnationImages","turnationImageUpdated","uri");
             mergeMapRecords(remote.optJSONArray("turnationOcr"),"turnationOcr","turnationOcrUpdated","text");
             JSONArray users=remote.optJSONArray("users");if(users!=null)mergeRemoteUsers(users);
+            JSONArray staff=remote.optJSONArray("staffDirectory");if(staff!=null)saveArray("staffDirectory",new JSONArray(staff.toString()));
         }finally{suppressChange=false;}
     }
 
@@ -241,9 +270,33 @@ public class AppStore {
         try{
             for(String key:SYNC_COLLECTIONS)saveArray(key,new JSONArray());
             saveArray("users",new JSONArray());
+            saveArray("staffDirectory",defaultStaffDirectory());
             prefs.edit().remove("turnationImages").remove("turnationImageUpdated").remove("turnationOcr").remove("turnationOcrUpdated").remove("turnationWeek").remove("turnationImage").remove("currentUser").apply();
         }finally{suppressChange=false;}
     }
+
+    public JSONArray rosterUsers(){
+        JSONArray result=new JSONArray(),users=array("users"),staff=array("staffDirectory");
+        java.util.HashSet<String> used=new java.util.HashSet<>();
+        for(int i=0;i<staff.length();i++){
+            JSONObject s=staff.optJSONObject(i);if(s==null||!s.optBoolean("active",true))continue;String roster=s.optString("roster_name","");if(roster.isEmpty())continue;
+            JSONObject match=findAccountForRoster(roster,users);String id;String role;boolean enabled=true;
+            if(match!=null){id=match.optString("id");role=match.optString("role","LETTURA");enabled=match.optBoolean("enabled",true);used.add(id.toUpperCase(Locale.ITALY));}
+            else{id="STAFF_"+staffStableId(s);String trade=s.optString("trade",""),team=s.optString("team","");role=("ELETTRICO".equals(trade)||"ELETTRICA".equals(team))?"ELETTRICO":"MECCANICO";}
+            JSONObject u=new JSONObject();try{u.put("id",id);u.put("name",roster);u.put("role",role);u.put("enabled",enabled);u.put("staff",true);u.put("badgeCode",s.optString("badge_code",""));u.put("trade",s.optString("trade",""));u.put("team",s.optString("team",""));}catch(Exception ignored){}result.put(u);
+        }
+        for(int i=0;i<users.length();i++){JSONObject u=users.optJSONObject(i);if(u==null)continue;String id=u.optString("id","").toUpperCase(Locale.ITALY);if(!used.contains(id))try{result.put(new JSONObject(u.toString()));}catch(Exception ignored){}}
+        return result;
+    }
+
+    private JSONObject findAccountForRoster(String roster,JSONArray users){
+        String surname=firstToken(roster);if(surname.isEmpty())return null;
+        for(int i=0;i<users.length();i++){JSONObject u=users.optJSONObject(i);if(u==null)continue;String[] parts=normalizeName(u.optString("name","")).split(" ");for(String p:parts)if(surname.equals(p))return u;}
+        return null;
+    }
+    private String firstToken(String s){String n=normalizeName(s);int p=n.indexOf(' ');return p<0?n:n.substring(0,p);}
+    private String normalizeName(String s){return s==null?"":s.toUpperCase(Locale.ITALY).replaceAll("[^A-ZÀ-ÖØ-Ý0-9]+"," ").trim();}
+    private String staffStableId(JSONObject s){String b=s.optString("badge_code","");if("null".equalsIgnoreCase(b))b="";b=b.replaceAll("[^A-Za-z0-9]","");if(!b.isEmpty())return b;return s.optString("roster_name","STAFF").toUpperCase(Locale.ITALY).replaceAll("[^A-Z0-9]","_");}
 
     public void setSetting(String key,String value){prefs.edit().putString("setting_"+key,value==null?"":value).apply();}
     public String getSetting(String key,String def){return prefs.getString("setting_"+key,def);}
