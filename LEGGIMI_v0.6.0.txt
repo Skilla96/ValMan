@@ -1,0 +1,16 @@
+ValMan v0.6.0 - SKILLA ASSISTANT+
+
+Base: v0.5.0 Shared AI, mantenendo OCR turnazioni e sincronizzazione.
+
+Novità:
+- Skilla Bot con azioni rapide Diagnosi / Spiegami / Manuale / Il mio turno.
+- Contesto macchina visibile e azzerabile dalla chat.
+- Riconoscimento vocale tecnico migliorato: punteggio dinamico usando nomi macchina e titoli dei documenti ValMan.
+- Normalizzazioni aggiuntive: carroponte, finecorsa, softstarter, Profibus, Profinet, Modbus e varianti vocali.
+- Domande diagnostiche più mirate per drive/inverter, sensori, elettrovalvole, motori, pompe e radiocomandi.
+- Risposte vocali più corte e naturali; la parte estesa rimane a schermo.
+- Conoscenza tecnica offline ampliata: inverter/motori, encoder/resolver, contattori, surriscaldamento motore, cuscinetti e pressostati.
+- Backend AI: stile più naturale, una domanda alla volta, distinzione più esplicita tra Storico ValMan e fonti Web.
+- Perimetro invariato: solo manutenzione industriale + conversazione cordiale. Fuori tema rifiutato.
+
+AIDE: installare sopra la v0.5.0, senza disinstallare, per preservare i dati locali.

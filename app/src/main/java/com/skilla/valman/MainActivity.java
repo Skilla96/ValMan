@@ -113,6 +113,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private String speechMode = "WAKE"; // inline recognizer is used only for wake phrase
     private boolean wakeConsumed = false;
 
+    // Navigation state for Android system Back. This app renders screens inside one Activity,
+    // so we explicitly mirror the same back action used by the header button.
+    private Runnable currentBackAction = null;
+    private String currentScreenKey = "";
+    private boolean botCloseDialogVisible = false;
+
     // OCR draft for the currently imported weekly rota.
     private List<TurnationOcr.Row> pendingOcrRows = new ArrayList<>();
     private String pendingOcrRaw = "";
@@ -192,6 +198,71 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     @Override
+    public void onBackPressed() {
+        if ("BOT".equals(currentScreenKey)) {
+            confirmCloseBot();
+            return;
+        }
+        if (currentBackAction != null) {
+            Runnable back = currentBackAction;
+            currentBackAction = null;
+            back.run();
+            return;
+        }
+        if (store != null && store.currentUser() != null && "DASHBOARD".equals(currentScreenKey)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("ValMan")
+                    .setMessage("Sei nella Home. Vuoi chiudere ValMan?")
+                    .setPositiveButton("Chiudi", (d,w) -> finish())
+                    .setNegativeButton("Annulla", null)
+                    .show();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    private void confirmCloseBot() {
+        if (botCloseDialogVisible) return;
+        botCloseDialogVisible = true;
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Chiudere chat con Skilla Bot?")
+                .setMessage("La conversazione e il contesto tecnico attuale verranno azzerati. I dati salvati in ValMan non vengono modificati.")
+                .setPositiveButton("Chiudi chat", (d,w) -> {
+                    botCloseDialogVisible = false;
+                    resetBotSession();
+                    showDashboard();
+                    scheduleWake(650);
+                })
+                .setNegativeButton("Continua chat", (d,w) -> botCloseDialogVisible = false)
+                .create();
+        dialog.setOnCancelListener(d -> botCloseDialogVisible = false);
+        dialog.show();
+    }
+
+    private void resetBotSession() {
+        voiceConversation = false;
+        botOnlineBusy = false;
+        stopSpeechRecognizer();
+        speechHandler.removeCallbacksAndMessages(null);
+        if (tts != null) { try { tts.stop(); } catch (Exception ignored) {} }
+        ttsSpeaking = false;
+        if (neuralPlayer != null) {
+            try { neuralPlayer.stop(); } catch (Exception ignored) {}
+            try { neuralPlayer.release(); } catch (Exception ignored) {}
+            neuralPlayer = null;
+        }
+        botWho.clear();
+        botText.clear();
+        botContextMachine = "";
+        botAwaiting = "";
+        botPendingFaultMachine = "";
+        botPendingFaultTitle = "";
+        lastManualSearch = "";
+        botInput = null;
+        botMessages = null;
+    }
+
+    @Override
     protected void onDestroy() {
         speechHandler.removeCallbacksAndMessages(null);
         mainHandler.removeCallbacksAndMessages(null);
@@ -220,6 +291,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     private LinearLayout screen() {
+        currentBackAction = null;
+        currentScreenKey = "";
         ScrollView s = new ScrollView(this);
         s.setFillViewport(true);
         s.setBackgroundColor(C_BG);
@@ -306,6 +379,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     private void addHeader(LinearLayout root, String name, final Runnable back) {
+        currentScreenKey = name == null ? "" : name;
+        currentBackAction = back;
         LinearLayout h=new LinearLayout(this); h.setGravity(Gravity.CENTER_VERTICAL); h.setPadding(0, dp(2), 0, dp(8));
         if(back!=null){
             Button b=button("‹", C_PANEL2); b.setTextSize(30);
@@ -322,7 +397,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void toast(String s) { Toast.makeText(this,s,Toast.LENGTH_SHORT).show(); }
 
     private void showAdminSetup() {
-        LinearLayout r=screen(); r.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout r=screen(); currentScreenKey="ADMIN_SETUP"; r.setGravity(Gravity.CENTER_HORIZONTAL);
         TextView logo=text("ValMan",38,C_TEXT,true); logo.setGravity(Gravity.CENTER); logo.setBackgroundResource(com.skilla.valman.R.drawable.bg_logo); logo.setPadding(dp(32),dp(24),dp(32),dp(24)); r.addView(logo);
         TextView a=sub("Manutenzione • configurazione iniziale"); a.setGravity(Gravity.CENTER); r.addView(a);
 
@@ -350,7 +425,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     private void showLogin() {
-        LinearLayout r=screen();
+        LinearLayout r=screen(); currentScreenKey="LOGIN";
         TextView logo=text("ValMan",38,C_TEXT,true); logo.setGravity(Gravity.CENTER); logo.setBackgroundResource(com.skilla.valman.R.drawable.bg_logo); logo.setPadding(dp(32),dp(24),dp(32),dp(24)); r.addView(logo);
         TextView p=sub(remoteBase().isEmpty()?"Manutenzione • accesso locale":"Manutenzione • accesso condiviso"); p.setGravity(Gravity.CENTER); r.addView(p);
         if(!remoteBase().isEmpty()){TextView cloud=sub("Server: "+remoteBase());cloud.setGravity(Gravity.CENTER);r.addView(cloud);}
@@ -425,7 +500,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     private void showDashboard() {
         final JSONObject u=store.currentUser(); if(u==null){showLogin();return;}
-        LinearLayout r=screen();
+        LinearLayout r=screen(); currentScreenKey="DASHBOARD"; currentBackAction=null;
 
         LinearLayout hero=card();
         hero.setPadding(dp(17),dp(15),dp(17),dp(15));
@@ -525,7 +600,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void showInterventions(){LinearLayout r=screen();addHeader(r,"Interventi",this::showDashboard);JSONArray a=store.array("interventions");if(a.length()==0)r.addView(sub("Nessun intervento registrato."));for(int i=a.length()-1;i>=0;i--){JSONObject o=a.optJSONObject(i);LinearLayout c=card();c.addView(text(o.optString("machine")+" • "+o.optString("type"),17,C_TEXT,true));c.addView(sub(o.optString("createdAt")+" • "+o.optString("userId")));c.addView(text(o.optString("note"),14,C_TEXT,false));if(!o.optString("parts").isEmpty())c.addView(sub("Ricambi: "+o.optString("parts")));r.addView(c);}}
 
     private void showBot() {
-        LinearLayout r=screen(); addHeader(r,"Skilla Bot",this::showDashboard);
+        LinearLayout r=screen(); addHeader(r,"Skilla Bot",this::confirmCloseBot); currentScreenKey="BOT";
 
         LinearLayout hero=card();
         hero.setBackground(grad(Color.rgb(18,58,83),Color.rgb(9,32,49),18));
@@ -549,6 +624,29 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if(voiceConversation) startVoiceCommand(); else { stopSpeechRecognizer(); scheduleWake(600); showBot(); }
         });
         r.addView(voiceBar);
+
+        LinearLayout quick=card();
+        quick.addView(text("Azioni rapide",13,C_CYAN,true));
+        LinearLayout q1=new LinearLayout(this);
+        Button diag=button("Diagnosi",C_PANEL2); Button explain=button("Spiegami",C_PANEL2);
+        q1.addView(diag,new LinearLayout.LayoutParams(0,dp(48),1)); q1.addView(explain,new LinearLayout.LayoutParams(0,dp(48),1));
+        quick.addView(q1);
+        LinearLayout q2=new LinearLayout(this);
+        Button manual=button("Manuale",C_PANEL2); Button shift=button("Il mio turno",C_PANEL2);
+        q2.addView(manual,new LinearLayout.LayoutParams(0,dp(48),1)); q2.addView(shift,new LinearLayout.LayoutParams(0,dp(48),1));
+        quick.addView(q2);
+        diag.setOnClickListener(v->{ if(botInput!=null){botInput.setText("Ho un problema su ");botInput.requestFocus();} });
+        explain.setOnClickListener(v->{ if(botInput!=null){botInput.setText("Spiegami la differenza tra ");botInput.requestFocus();} });
+        manual.setOnClickListener(v->{ if(botInput!=null){botInput.setText("Cercami il manuale ufficiale di ");botInput.requestFocus();} });
+        shift.setOnClickListener(v->submitBotQuery("Che turno faccio oggi?"));
+        r.addView(quick);
+
+        if(!botContextMachine.isEmpty()){
+            LinearLayout ctx=card(); ctx.addView(text("Contesto attivo: "+botContextMachine,13,C_ORANGE,true));
+            ctx.addView(sub("Le prossime domande brevi verranno collegate a questa macchina."));
+            Button reset=button("Azzera contesto",C_PANEL2); ctx.addView(reset);
+            reset.setOnClickListener(v->{botContextMachine="";botAwaiting="";showBot();}); r.addView(ctx);
+        }
 
         botMessages=new LinearLayout(this); botMessages.setOrientation(LinearLayout.VERTICAL); r.addView(botMessages);
         if (botText.isEmpty()) addConversation("Skilla Bot","Dimmi pure. Posso aiutarti con guasti, turni, schemi, manuali e domande tecniche di manutenzione.",false);
@@ -882,7 +980,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if(x.contains("bisell")||x.contains("bisella")) return "La bisella non si muove, va in guasto, non raggiunge la posizione oppure lavora male?";
         if(x.contains("pompa")) return "La pompa non parte, gira senza pressione, perde oppure compare un allarme?";
         if(x.contains("motore")) return "Il motore non parte, si ferma, scalda oppure va in allarme?";
-        return "Che comportamento preciso vedi, e il difetto è continuo o intermittente?";
+        if(x.contains("inverter")||x.contains("drive")) return "Che marca/modello è e quale codice o messaggio compare sul display del drive?";
+        if(x.contains("sensore")||x.contains("finecorsa")||x.contains("fotocell")) return "Il sensore cambia stato sul LED? E l'ingresso corrispondente cambia anche sul PLC o sulla diagnostica macchina?";
+        if(x.contains("valvol")||x.contains("elettrovalvol")) return "La bobina riceve tensione quando dovrebbe commutare? La valvola cambia stato manualmente o resta bloccata?";
+        if(x.contains("radiocomando")||x.contains("carroponte")||x.contains("gru")) return "Mi dai marca e modello del trasmettitore/ricevitore oppure il codice della targhetta? Per pairing e sicurezza uso la procedura specifica del costruttore.";
+        return "Che comportamento preciso vedi, da quando succede e il difetto è continuo o intermittente?";
     }
 
     private boolean relevant(String note,String q){
@@ -911,7 +1013,13 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         x=x.replaceAll("(?i)\\bs\\s*a\\s*s\\s*(2|due)\\b","SAS 2");
         x=x.replaceAll("(?i)\\bsas\\s*(2|due)\\b","SAS 2");
         x=x.replaceAll("(?i)\\bradio\\s+comando\\b","radiocomando");
+        x=x.replaceAll("(?i)\\bcarro\\s+ponte\\b","carroponte");
+        x=x.replaceAll("(?i)\\bfine\\s+corsa\\b","finecorsa");
         x=x.replaceAll("(?i)\\bin\\s+verter\\b","inverter");
+        x=x.replaceAll("(?i)\\bsoft\\s+starter\\b","softstarter");
+        x=x.replaceAll("(?i)\\bprofi\\s+bus\\b","profibus");
+        x=x.replaceAll("(?i)\\bprofi\\s+net\\b","profinet");
+        x=x.replaceAll("(?i)\\bmod\\s+bus\\b","modbus");
         x=x.replaceAll("(?i)\\belettr[o]?\\s*valvola\\b","elettrovalvola");
         x=x.replaceAll("(?i)\\bp\\s*l\\s*c\\b","PLC");
         x=x.replaceAll("\\s+"," ").trim();
@@ -944,7 +1052,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             String n=normalizeSpeechText(raw); int score=0;
             if(TechnicalKnowledge.isTechnical(n))score+=20;
             if(n.contains("2b60")||n.contains("sas2"))score+=25;
-            if(n.contains("inverter")||n.contains("radiocomando")||n.contains("elettrovalvola")||n.contains("plc"))score+=12;
+            if(n.contains("inverter")||n.contains("radiocomando")||n.contains("elettrovalvola")||n.contains("plc")||n.contains("finecorsa")||n.contains("carroponte")||n.contains("profibus")||n.contains("profinet"))score+=12;
+            JSONArray knownMachines=store==null?new JSONArray():store.array("machines");
+            for(int mi=0;mi<knownMachines.length();mi++){JSONObject mo=knownMachines.optJSONObject(mi);if(mo==null)continue;String mn=normalizeSpeechText(mo.optString("name"));if(!mn.isEmpty()&&n.contains(mn))score+=30;}
+            JSONArray knownDocs=store==null?new JSONArray():store.array("documents");
+            for(int di=Math.max(0,knownDocs.length()-20);di<knownDocs.length();di++){JSONObject d=knownDocs.optJSONObject(di);if(d==null)continue;String title=normalizeSpeechText(d.optString("title"));for(String w:title.split(" "))if(w.length()>4&&n.contains(w))score+=2;}
             if(!botContextMachine.isEmpty()&&looksLikeFollowUp(n))score+=5;
             if(!botAwaiting.isEmpty())score+=3;
             score+=Math.min(10,n.length()/12);
@@ -970,7 +1082,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if(source<0)source=x.toLowerCase(Locale.ITALY).indexOf("fonte:");
         if(source>0)x=x.substring(0,source).trim()+". Le fonti sono indicate a schermo.";
         x=x.replaceAll("[\\p{So}]","").replaceAll("\\s+"," ").trim();
-        if(x.length()>900)x=x.substring(0,900)+". Se vuoi continuo con i dettagli.";
+        if(x.length()>620)x=x.substring(0,620)+". Se vuoi, continuo con i dettagli.";
         return x;
     }
 
@@ -1026,7 +1138,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},55);return;}
         stopSpeechRecognizer();
         Intent i=speechIntent();
-        i.putExtra(RecognizerIntent.EXTRA_PROMPT,"Parla con Skilla Bot");
+        i.putExtra(RecognizerIntent.EXTRA_PROMPT,"Parla normalmente. Skilla riconosce termini tecnici e codici macchina.");
         i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,false);
         try{
             startActivityForResult(i,REQ_SPEECH);

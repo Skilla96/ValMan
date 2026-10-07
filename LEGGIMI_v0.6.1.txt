@@ -1,0 +1,10 @@
+ValMan v0.6.1 - NAVIGAZIONE BACK + RESET CHAT SKILLA
+
+Novita:
+- Il tasto Indietro di Android segue la navigazione interna dell'app invece di chiudere subito l'Activity.
+- In Skilla Bot, sia il tasto Indietro di sistema sia la freccia in alto mostrano una conferma prima di lasciare la chat.
+- "Chiudi chat" azzera conversazione, macchina contestuale, richiesta in sospeso e modalita voce, senza modificare guasti/interventi/dati ValMan.
+- "Continua chat" lascia tutto invariato.
+- Dalla Home, Indietro mostra una conferma prima di chiudere ValMan.
+
+Installare sopra la v0.5/v0.6 senza disinstallare per mantenere i dati locali.

@@ -212,7 +212,7 @@ FUORI AMBITO: cucina, sport, gossip, intrattenimento e richieste non pertinenti.
 METODO: comportati come un agente tecnico. Se il manutentore descrive un problema incompleto, fai UNA domanda diagnostica utile alla volta invece di fermarti. Mantieni il contesto. Distingui chiaramente: (1) dati/storico ValMan, (2) conoscenza tecnica generale, (3) fonti Web/manuali. Non inventare interventi, valori, codici o procedure.
 MANUALI: per pairing, configurazioni, parametri o procedure di un dispositivo specifico chiedi marca/modello se mancano; privilegia manuale ufficiale del costruttore. Se trovi una fonte Web, cita nome documento/sezione e URL.
 SICUREZZA: assistenza consultiva soltanto. Mai comandare PLC, gru, azionamenti o macchine, mai bypassare protezioni/interblocchi. Per attività con energia pericolosa richiama procedure aziendali, isolamento/LOTO e manuale del costruttore. Se una misura o procedura è incerta, dichiaralo.
-VOCE: risposte iniziali brevi, naturali e concrete; approfondisci se richiesto.`;
+VOCE: risposte iniziali brevi, naturali e concrete; niente linguaggio da manuale se non richiesto. Fai una sola domanda utile alla volta. Se l’utente dice “spiegamelo semplice” usa parole da officina; se dice “tecnico” o “dettagli” aumenta il livello. Quando citi dati interni specifica “Storico ValMan”; quando usi il Web cita il costruttore/documento.`;
 
 function extractUrls(response){const urls=[];const walk=v=>{if(!v)return;if(Array.isArray(v)){for(const x of v)walk(x);return;}if(typeof v!=="object")return;if(v.type==="url_citation"&&v.url)urls.push(v.url);for(const value of Object.values(v))walk(value);};walk(response.output);return [...new Set(urls)].slice(0,6);}
 
@@ -241,4 +241,4 @@ app.post("/api/tts",auth,async(req,res)=>{
 app.get("/api/audit",auth,adminOnly,(req,res)=>{res.json({audit:db.prepare("SELECT * FROM audit ORDER BY id DESC LIMIT 300").all()});});
 
 app.use((req,res)=>res.status(404).json({error:"NOT_FOUND",message:"Endpoint non trovato"}));
-app.listen(PORT,"0.0.0.0",()=>console.log(`ValMan backend v0.5 on :${PORT} • DB ${DB_PATH}`));
+app.listen(PORT,"0.0.0.0",()=>console.log(`ValMan backend v0.6 on :${PORT} • DB ${DB_PATH}`));

@@ -22,12 +22,12 @@ public final class TechnicalKnowledge {
 
     private static final String[] TECH = {
             "meccanic","elettric","elettronic","automaz","plc","inverter","azionament","motore","encoder","resolver","sensore",
-            "finecorsa","fotocell","proximity","prossimit","elettrovalvol","valvol","pneumatic","idraulic","pression","pompa",
+            "finecorsa","fine corsa","fotocell","proximity","prossimit","elettrovalvol","valvol","pneumatic","idraulic","pression","pompa",
             "cilindr","accumulator","cesoia","bisell","mola","riduttore","cuscinet","boccol","ingranagg","catena","cinghia",
             "sald","torn","fres","foratur","filett","maniglia","copertura","lamiera","gru","carroponte","radiocomando",
             "contattore","rele","relè","fusibile","magnetoterm","differenzial","24v","400v","230v","canopen","profibus",
             "profinet","ethercat","modbus","ethernet ip","siemens","abb","schneider","sew","lenze","danfoss","omron",
-            "pilz","sick","pepperl","balluff","ifm","manuale","schema","datasheet","morsett","bobina","solenoide","termica",
+            "pilz","sick","pepperl","balluff","ifm","manuale","schema","datasheet","morsett","bobina","solenoide","termica","servo","servomotore","brake","freno","ponte raddrizzatore","softstarter","soft starter","encoder","resolver","sicurezza","interblocco",
             "guasto","allarme","errore","fault","trip","reset","taratur","calibr","lubrific","grasso","olio","manutenz",
             "vite","bullon","dado","rondell","filetto","coppia","torque","diametro","tolleranz","acciaio","inox","allumin","bronzo",
             "cavo","tensione","corrente","volt","ampere","ohm","resistenz","condensator","trasformator","alimentator","circuit",
@@ -96,6 +96,31 @@ public final class TechnicalKnowledge {
 
         if (x.contains("inverter") && (x.contains("manuale") || x.contains("parametr") || x.contains("errore") || x.contains("allarme"))) {
             return "Posso aiutarti, ma per essere preciso mi serve marca e modello esatto dell'inverter e, se c'è, il codice allarme. Se il manuale è già caricato in ValMan lo cerco lì; altrimenti posso preparare la ricerca del manuale ufficiale del costruttore.";
+        }
+
+
+        if (x.contains("inverter") && (x.contains("motore") || x.contains("frequenza") || x.contains("velocita"))) {
+            return "Un inverter regola velocità e coppia del motore variando frequenza e tensione di alimentazione. In diagnosi separa sempre tre cose: alimentazione del drive, stato/consensi del drive e lato motore. Se c'è un allarme, il codice esatto è la prima informazione da prendere; poi controlla tensioni, consensi, riferimento di velocità, cablaggio motore e parametri senza modificarli alla cieca. Se mi dai marca, modello e codice allarme posso restringere la ricerca.";
+        }
+
+        if ((x.contains("encoder") || x.contains("resolver")) && (x.contains("differenza") || x.contains("cos e") || x.contains("come funziona") || x.contains("problema"))) {
+            return "Encoder e resolver misurano posizione/velocità, ma lavorano in modo diverso. L'encoder genera segnali digitali o assoluti; il resolver è un trasduttore elettromagnetico analogico molto robusto in ambienti gravosi. Se un asse perde posizione o un drive segnala feedback, controlla prima connettori, schermature, alimentazioni e integrità del cavo; poi confronta il codice allarme col manuale del drive.";
+        }
+
+        if ((x.contains("contattore") || x.contains("bobina")) && (x.contains("non attacca") || x.contains("non chiude") || x.contains("non eccita"))) {
+            return "Se un contattore non attacca, verifica in ordine: tensione corretta ai capi della bobina durante il comando, tensione nominale della bobina, continuità della bobina a impianto disalimentato, eventuali interblocchi/consensi in serie e libertà meccanica del nucleo. Se la tensione arriva ma non chiude, il problema è probabilmente sul contattore/bobina; se non arriva, va risalita la catena di comando. Lavora secondo procedura aziendale e con le misure di sicurezza previste.";
+        }
+
+        if ((x.contains("motore") || x.contains("asincrono")) && (x.contains("scalda") || x.contains("surriscald") || x.contains("termica"))) {
+            return "Un motore che scalda può dipendere da sovraccarico meccanico, corrente sbilanciata tra fasi, ventilazione insufficiente, cuscinetti, tensione anomala o parametri inverter non corretti. Prima raccogli corrente sulle tre fasi, temperatura, carico e stato ventilazione; se è alimentato da inverter controlla anche frequenza, corrente e dati targa impostati nel drive.";
+        }
+
+        if (x.contains("cuscinet") && (x.contains("rumor") || x.contains("vibra") || x.contains("cald") || x.contains("gioco"))) {
+            return "Su un cuscinetto rumoroso o caldo controllerei lubrificazione, gioco, allineamento, precarico, contaminazione e condizioni della sede. Un rumore che cambia con il carico o una temperatura crescente sono indizi utili, ma prima di sostituire conviene confrontare vibrazione/temperatura con il lato opposto e verificare che non sia il giunto o il riduttore a trasmettere il rumore.";
+        }
+
+        if ((x.contains("pressostat") || x.contains("sensore pressione")) && (x.contains("tar") || x.contains("regol") || x.contains("non commuta"))) {
+            return "Per un pressostato verifica prima se è meccanico o elettronico, il campo di pressione e il tipo di uscita. Prima di ritoccare la taratura misura la pressione reale con uno strumento affidabile e confrontala con il punto di commutazione previsto. Se è elettronico servono marca/modello perché isteresi, uscita PNP/NPN e menu cambiano da dispositivo a dispositivo.";
         }
 
         if (x.contains("manuale") || x.contains("datasheet") || x.contains("schema")) {
