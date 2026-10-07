@@ -1,0 +1,74 @@
+ValMan v0.4.0 - Skilla Bot Pro / Voice / Technical Agent
+
+AGGIORNAMENTO SOPRA v0.3.0
+- applicationId invariato: com.skilla.valman
+- versionCode 8 / versionName 0.4.0
+- Installare come aggiornamento senza disinstallare per mantenere i dati locali.
+
+NOVITA SKILLA BOT
+1) PERIMETRO TECNICO
+- Risponde su meccanica, elettrica/elettronica, automazione, PLC come supporto consultivo, inverter/azionamenti, idraulica, pneumatica, officina, componenti, guasti, schemi, manuali, sicurezza e dati ValMan.
+- Domande fuori tema (es. ricette, sport, gossip) vengono rifiutate cordialmente.
+- Saluti e piccola conversazione sociale sono ammessi.
+
+2) CONVERSAZIONE / AGENTE
+- Mantiene macchina e contesto tra un messaggio e il successivo.
+- Se mancano informazioni fa domande invece di bloccarsi.
+- Può preparare un nuovo guasto da una frase vocale e chiede conferma prima di salvarlo.
+- Cerca prima nello storico ValMan e nei documenti locali.
+- Le fonti Web restano cliccabili quando arrivano dal backend AI.
+
+3) RICONOSCIMENTO VOCALE TECNICO
+- Valuta più risultati del riconoscitore e preferisce quelli coerenti con termini tecnici e macchine.
+- Normalizza varianti come 2B60 / 2 B 60 / due bi sessanta, SAS 2, radio comando/radiocomando, PLC, inverter.
+- Hey Skilla resta disponibile mentre ValMan è aperto.
+- Modalità conversazione vocale: dopo la risposta torna ad ascoltare automaticamente finché non viene fermata.
+
+4) VOCE PIU NATURALE
+- Seleziona automaticamente la migliore voce italiana disponibile nel motore TTS del telefono.
+- Preferenza automatica per la migliore voce italiana disponibile sul telefono.
+- Se il backend è configurato, può usare una voce neurale più naturale tramite `/tts`, con fallback automatico alla voce Android.
+- Velocità e pitch del fallback regolati per un parlato meno robotico.
+- Le fonti lunghe non vengono lette integralmente: restano a schermo.
+
+5) CONOSCENZA TECNICA OFFLINE
+Sono già gestiti alcuni casi base utili anche senza server, per esempio:
+- elettrovalvola monostabile vs bistabile;
+- PNP vs NPN;
+- relè vs contattore;
+- 4-20 mA vs 0-10 V;
+- accumulatore idraulico;
+- progettazione preliminare di una maniglia/carter;
+- richieste su radiocomandi e inverter con richiesta di marca/modello.
+
+6) MANUALI
+- Cerca prima i documenti caricati in ValMan.
+- Se non trova nulla e non è configurata l'AI online, offre una ricerca Web del manuale del costruttore.
+- Se è configurato il backend AI, la richiesta può essere affidata all'agente con ricerca Web.
+
+AI ONLINE - ARCHITETTURA CORRETTA
+- La chiave API NON viene salvata nell'APK.
+- Admin > Impostazioni Skilla Bot permette di inserire solo l'endpoint HTTPS del proprio server.
+- La cartella /server contiene un template Node.js per collegare il backend all'AI e alla ricerca Web.
+- Prima di distribuire in azienda il server va protetto con autenticazione, ruoli, rate limit, audit, retention e policy aziendali.
+
+SICUREZZA
+- Skilla Bot è consultivo.
+- Non invia comandi a PLC, gru, azionamenti o macchine.
+- Non deve proporre bypass di protezioni/interblocchi.
+- Per procedure specifiche su apparecchiature richiede modello/manuale e richiama le procedure di sicurezza aziendali quando necessario.
+
+BUILD AIDE
+1. Estrai lo ZIP.
+2. Apri la cartella ValMan_v0.4.0_AIDE_SKILLA_PRO in AIDE.
+3. Premi Run/Build.
+4. Installa come aggiornamento della v0.3.0.
+
+TEST CONSIGLIATI
+- "Hey Skilla, che turno faccio lunedì?"
+- "Ho un problema con la 2 B 60"
+- poi: "la cesoia non taglia bene"
+- "qual è la differenza tra elettrovalvola monostabile e bistabile?"
+- "come posso fare una maniglia per la copertura della cesoia?"
+- "cercami il manuale dell'inverter ABB ACS880"
+- "come si fa la carbonara?" -> deve rifiutare e restare nel contesto manutenzione.

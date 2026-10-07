@@ -1,0 +1,18 @@
+VALMAN v0.5.0 - AIDE
+====================
+
+1. Estrai completamente lo ZIP.
+2. In AIDE apri la cartella ValMan_v0.5.0_AIDE_SHARED_AI (quella che contiene gradlew, build.gradle, settings.gradle e app).
+3. Premi Run/Build.
+4. Installa SOPRA la v0.4.0: non disinstallare se vuoi conservare i dati locali.
+
+Requisiti mantenuti per AIDE:
+- Java 8
+- Gradle wrapper 6.7.1
+- Android Gradle Plugin 4.2.2
+- compileSdk 33
+- targetSdk 30
+- ML Kit Text Recognition 16.0.1
+
+La parte server NON viene compilata da AIDE: è nella cartella server ed è destinata a un server/VPS/Docker con HTTPS.
+L'app resta utilizzabile anche senza backend.

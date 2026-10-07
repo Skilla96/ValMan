@@ -1,0 +1,26 @@
+ValMan v0.2.0 - AGENT + OCR + HEY SKILLA
+
+NOVITA PRINCIPALI
+- Turnazione: la foto non viene piu solo mostrata. Dopo il caricamento parte OCR on-device (ML Kit), viene preparata una bozza e l'admin deve verificare/confermare i 7 giorni prima della pubblicazione.
+- La foto originale resta sempre salvata come riferimento.
+- Storico foto turnazione per settimana.
+- Hey Skilla: mentre ValMan e aperto, il riconoscimento vocale resta in ascolto della frase "Hey Skilla" / "Ehi Skilla". Non funziona a schermo spento o con app chiusa in questa versione.
+- Pulsante "Hey Skilla" visibile in tutte le schermate quando l'utente e loggato.
+- Riconoscimento varianti macchina: 2B60, 2B 60, 2 B 60, due B sessanta, SAS 2, SAS due.
+- Skilla Bot mantiene il contesto della conversazione: se dici solo "ho un guasto alla 2B" chiede il sintomo invece di fermarsi.
+- Domande successive specifiche per cesoia/taglio, bisella, pompa, motore.
+- La diagnosi usa solo storico ValMan; non comanda PLC o macchine.
+
+COMPILAZIONE AIDE
+1. Estrai completamente la cartella.
+2. Apri la cartella ValMan_v0.2.0_AIDE_AGENT in AIDE.
+3. Premi Run/Build.
+4. La prima build scarica anche la libreria OCR ML Kit (qualche MB in piu).
+
+AGGIORNAMENTO
+- applicationId resta com.skilla.valman e versionCode passa a 2.
+- Se AIDE installa sopra la v0.1, i dati locali dovrebbero restare.
+- NON disinstallare la v0.1 prima dell'aggiornamento se vuoi mantenere i dati locali.
+
+NOTA TURNI
+L'OCR e volutamente assistito: foto inclinate, riflessi, scritte a penna e celle come "G REP" possono essere ambigue. Nessun dato OCR viene pubblicato senza conferma dell'amministratore.

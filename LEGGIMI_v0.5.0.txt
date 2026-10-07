@@ -1,0 +1,51 @@
+VALMAN v0.5.0 - SHARED BACKEND + SKILLA AI
+===========================================
+
+Questa versione parte dalla v0.4.0 stabile e mantiene OCR geometrico, turnazioni, Hey Skilla, voce, agente tecnico locale e UI premium.
+
+NOVITA PRINCIPALI
+-----------------
+1. Modalita local-first: l'app continua a funzionare senza rete.
+2. Server condiviso opzionale con account reali.
+3. L'amministratore crea solo ID + nome + ruolo; il collega sceglie la password al primo accesso.
+4. Token del server cifrato con Android Keystore sul telefono.
+5. Sincronizzazione automatica con debounce + pulsante Sync manuale.
+6. Dati sincronizzati: impianti, guasti, interventi, ferie/PAR, comunicazioni, consegne, turni e metadati documenti.
+7. Migrazione dei vecchi ID locali: al primo sync dell'admin vengono creati sul server senza password e i colleghi li reclamano al primo accesso.
+8. Skilla Bot online autenticato: il server cerca direttamente nello storico condiviso e considera anche i dati locali non ancora sincronizzati.
+9. Ricerca Web e file_search opzionale lato server per manuali tecnici.
+10. Voce neurale lato server opzionale; fallback automatico alla voce Android.
+11. Audit server delle operazioni principali.
+
+IMPORTANTE SUGLI ALLEGATI
+-------------------------
+I record strutturati sono condivisi. Gli URI Android content:// di foto e documenti sono validi solo sul telefono originario e NON vengono copiati sugli altri telefoni in questa build.
+Il backend include già /api/files e supporto opzionale al vector store per preparare la fase allegati condivisi, ma la v0.5 non converte ancora automaticamente tutti gli allegati locali in file server.
+
+AGGIORNAMENTO DA v0.4
+---------------------
+- NON disinstallare v0.4 se vuoi conservare i dati.
+- Apri in AIDE la cartella ValMan_v0.5.0_AIDE_SHARED_AI.
+- Build/Run e installa come aggiornamento (stesso applicationId, versionCode maggiore).
+
+COLLEGAMENTO SERVER
+-------------------
+Dopo aver distribuito il backend:
+Amministrazione -> Server & sincronizzazione
+1. Inserisci URL HTTPS.
+2. Test connessione.
+3. La prima volta inserisci il codice setup definito sul server e la password admin.
+4. Premi Inizializza server.
+5. Premi Sincronizza ora.
+
+Per un collega su telefono nuovo:
+- apre ValMan;
+- sceglie "Collegati a ValMan condiviso";
+- inserisce URL server;
+- entra con l'ID che gli hai dato;
+- al primo accesso sceglie la password.
+
+BACKEND
+-------
+La cartella server contiene Dockerfile, docker-compose.yml, .env.example e README.md.
+Non inserire mai OPENAI_API_KEY/JWT_SECRET nell'APK.

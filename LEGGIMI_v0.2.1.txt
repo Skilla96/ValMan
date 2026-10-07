@@ -1,0 +1,10 @@
+ValMan v0.2.1 - AIDE SDK 33 FIX
+
+Correzione build:
+- compileSdkVersion portato da 30 a 33 per compatibilita con le dipendenze OCR/AndroidX richieste da ML Kit.
+- Java 8, Gradle 6.7.1 e Android Gradle Plugin 4.2.2 restano invariati per AIDE.
+- targetSdkVersion resta 30 per non cambiare il comportamento runtime della build in questa fase.
+- versionCode 3 / versionName 0.2.1.
+
+Apri in AIDE la cartella radice che contiene app, gradle, gradlew, build.gradle e settings.gradle, quindi premi Run/Build.
+Al primo build AIDE potrebbe scaricare Android SDK Platform 33.

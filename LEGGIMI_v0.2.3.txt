@@ -1,0 +1,11 @@
+ValMan v0.2.3 - OCR TURNATION FIX
+
+Correzioni principali:
+- OCR turnazione: lettura prima per riga completa del dipendente, poi fallback per colonne.
+- Tolleranza a foto curve/prospettiche e piccole imprecisioni OCR nei cognomi.
+- Riconoscimento automatico della settimana dal range date stampato sul foglio.
+- Una foto di una vecchia settimana non viene più salvata sotto la settimana corrente.
+- Mostra la riga OCR letta per poter verificare subito cosa ha capito.
+- Mantiene tutte le funzioni v0.2.2, incluso Voice Fix e Skilla Bot.
+
+Installare come aggiornamento senza disinstallare la versione precedente.

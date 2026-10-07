@@ -1,0 +1,28 @@
+ValMan v0.3.0 - Premium UI + OCR geometrico
+
+AGGIORNAMENTO SOPRA v0.2.4
+- Stesso applicationId: com.skilla.valman
+- versionCode 7 / versionName 0.3.0
+- Non disinstallare la versione precedente se vuoi mantenere i dati locali.
+
+OCR TURNAZIONE
+- Il nome del dipendente resta il punto di ancoraggio.
+- I 7 turni non vengono più cercati dentro una fascia orizzontale larga.
+- Ogni colonna giorno viene analizzata separatamente e viene scelto il codice OCR più vicino alla riga del dipendente.
+- La riga segue gradualmente l'eventuale inclinazione/prospettiva della foto.
+- Supporta cluster separati come G + REP e N + C.
+- La pubblicazione resta sempre manualmente confermata dall'amministratore.
+
+GRAFICA
+- Dashboard ridisegnata in stile industriale premium.
+- Pannelli scuri con gradienti, bordi e profondità.
+- Hey Skilla trasformato in barra assistente più compatta.
+- Statistiche meno "blocchi colorati" e più leggibili.
+- Menu principale con tile, icona, titolo e descrizione.
+- Header, campi, pulsanti e card aggiornati in tutta l'app.
+
+BUILD AIDE
+1. Estrai lo ZIP.
+2. Apri la cartella ValMan_v0.3.0_AIDE_PREMIUM_OCR in AIDE.
+3. Premi Run/Build.
+4. Installala come aggiornamento della precedente.
