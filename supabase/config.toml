@@ -1,0 +1,5 @@
+[functions.bootstrap-admin]
+verify_jwt = false
+
+[functions.claim-account]
+verify_jwt = false

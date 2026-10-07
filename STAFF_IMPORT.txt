@@ -1,0 +1,27 @@
+VALMAN - IMPORT MANUTENTORI VISIBILI SU TURNAZIONE
+=================================================
+
+Questi nominativi vengono aggiunti come anagrafica tecnica/turnazione.
+NON vengono creati account, password o codici di attivazione automaticamente.
+
+DIREZIONE / CAPI
+- ECCHER L. - cart. 10250 - Capo reparto
+- CARRARO G. - cart. 18331 - Capo squadra meccanica
+- MICHELONI M. - cart. 197 - Capo squadra elettrica
+
+MECCANICI
+- MOTTIN D. - cart. 17919
+- ASBOCK M. - cartellino non visibile
+- VISINTAINER N. - cart. 18026
+- SCHILLACI P. - cart. 10479
+- CRISTOFORETTI A. - cartellino non visibile
+- GJEKA E. - cart. 10472
+- KEMENATER N. - cartellino non visibile
+
+ELETTRICI / ELETTRONICI
+- VACCARI C. - cart. 190
+- PRESCIANOTTO G. - cartellino non visibile
+- COSTA M. - cart. 10312
+- STATILE V. - cart. 10313
+
+I cartellini mancanti restano NULL finché non vengono confermati.

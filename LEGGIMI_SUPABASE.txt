@@ -1,0 +1,20 @@
+VALMAN - SUPABASE CORE v0.1
+===========================
+
+Contiene:
+- schema Postgres/RLS compatibile con le collezioni locali ValMan 0.6.x
+- bucket privato valman-files (50 MB per file)
+- RPC admin_create_employee(): crea un ID dipendente e restituisce un codice attivazione monouso
+- Edge Function bootstrap-admin: inizializzazione del primo amministratore
+- Edge Function claim-account: primo accesso dipendente con ID + codice attivazione + password scelta dal dipendente
+
+IMPORTANTE
+- NON mettere secret key Supabase o OPENAI_API_KEY nell'APK o su GitHub.
+- Prima di usare bootstrap-admin, configurare in Supabase Edge Function Secrets: VALMAN_SETUP_CODE=<codice lungo scelto da te>.
+- La publishable key può stare nell'app; la secret key resta solo lato Supabase.
+
+AGGIUNTA v0.2 - ANAGRAFICA MANUTENZIONE
+---------------------------------------
+La migration 202610070002_staff_directory.sql aggiunge l'anagrafica dei manutentori/capi
+visibili sulla turnazione fornita dall'amministratore. I dati servono per turnazione, OCR,
+filtri meccanica/elettrica e futura assegnazione interventi. Non vengono creati account o password.
